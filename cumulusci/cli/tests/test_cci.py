@@ -40,8 +40,7 @@ from cumulusci.utils import temporary_dir
 
 
 def run_click_command(cmd, *args, **kw):
-    """Run a click command with a mock context and injected CCI runtime object.
-    """
+    """Run a click command with a mock context and injected CCI runtime object."""
     runtime = kw.pop("runtime", mock.Mock())
     with mock.patch("cumulusci.cli.cci.RUNTIME", runtime):
         with click.Context(command=mock.Mock()):
@@ -85,8 +84,7 @@ class TestCCI(unittest.TestCase):
             "cumulusci.cli.cci.cleanup_org_cache_dirs", self.cleanup_org_cache_dirs
         )
         self.cleanup_org_cache_dirs_fileutils_patch = mock.patch(
-            "cumulusci.utils.fileutils.cleanup_org_cache_dirs",
-            self.cleanup_org_cache_dirs,
+            "cumulusci.core.utils.cleanup_org_cache_dirs", self.cleanup_org_cache_dirs
         )
         self.cleanup_org_cache_dirs_cli_patch.start()
         self.cleanup_org_cache_dirs_fileutils_patch.start()
@@ -1221,7 +1219,7 @@ Environment Info: Rossian / x68_46
 
         runtime.keychain.list_orgs.return_value = list(org_configs.keys())
         runtime.keychain.get_org = lambda orgname: org_configs[orgname]
-        runtime.project_config.project_cache_dir = Path("does_not_possibly_exist")
+        runtime.project_config.cache_dir = Path("does_not_possibly_exist")
 
         runtime.keychain.get_default_org.return_value = (
             "test0",
@@ -2013,7 +2011,9 @@ Environment Info: Rossian / x68_46
             )
         assert "-o" in str(e.value)
 
-    def test_flow_run_delete_non_scratch(self,):
+    def test_flow_run_delete_non_scratch(
+        self,
+    ):
         org_config = mock.Mock(scratch=False)
         runtime = mock.Mock()
         runtime.get_org.return_value = ("test", org_config)

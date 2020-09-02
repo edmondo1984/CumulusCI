@@ -3,13 +3,20 @@ from io import BytesIO, UnsupportedOperation
 from pathlib import Path
 from unittest import mock
 from tempfile import TemporaryDirectory
+import os
+import sys
 
 import pytest
 import responses
+from fs import open_fs, errors
 
+import cumulusci
 from cumulusci.utils import fileutils, temporary_dir
-from cumulusci.utils.fileutils import load_from_source, cleanup_org_cache_dirs
-from cumulusci.core.config import OrgConfig
+from cumulusci.utils.fileutils import (
+    load_from_source,
+    open_fs_resource,
+    FSResource,
+)
 
 
 class TestFileutils:
@@ -48,69 +55,183 @@ class TestFileutils:
         with load_from_source("http://www.salesforce.com") as (filename, data):
             assert data.read() == html
 
-    @responses.activate
     def test_load_from_Path(self):
-        import cumulusci
-
         p = Path(cumulusci.__file__).parent / "cumulusci.yml"
         with load_from_source(p) as (filename, data):
             assert "tasks:" in data.read()
 
-    @responses.activate
     def test_load_from_path_string(self):
-        import cumulusci
-
         p = Path(cumulusci.__file__).parent / "cumulusci.yml"
         with load_from_source(str(p)) as (filename, data):
             assert "tasks:" in data.read()
 
+    def test_load_from_open_file(self):
+        p = Path(cumulusci.__file__).parent / "cumulusci.yml"
+        with open(p) as f:
+            with load_from_source(f) as (filename, data):
+                assert "tasks:" in data.read()
+                assert str(p) == filename
 
-def _touch_test_org_file(directory):
-    org_dir = directory / "orginfo/something.something.saleforce.com"
-    org_dir.mkdir(parents=True)
-    (org_dir / "testfile.json").touch()
-    return org_dir
+    def test_load_from_fs_resource(self):
+        p = Path(cumulusci.__file__).parent / "cumulusci.yml"
+        with open_fs_resource(p) as p2:
+            with load_from_source(p2) as (filename, data):
+                assert "tasks:" in data.read()
 
 
-class TestCleanupCacheDir:
-    def test_cleanup_cache_dir(self):
-        keychain = mock.Mock()
-        keychain.list_orgs.return_value = ["qa", "dev"]
-        org = mock.Mock()
-        org.config.get.return_value = "http://foo.my.salesforce.com/"
-        keychain.get_org.return_value = org
-        project_config = mock.Mock()
-        with TemporaryDirectory() as temp_for_global:
-            keychain.global_config_dir = Path(temp_for_global)
-            global_org_dir = _touch_test_org_file(keychain.global_config_dir)
-            with TemporaryDirectory() as temp_for_project:
-                cache_dir = project_config.project_cache_dir = Path(temp_for_project)
-                project_org_dir = _touch_test_org_file(cache_dir)
-                with mock.patch("cumulusci.utils.fileutils.rmtree") as rmtree:
-                    cleanup_org_cache_dirs(keychain, project_config)
-                    rmtree.assert_has_calls(
-                        [mock.call(global_org_dir), mock.call(project_org_dir)],
-                        any_order=True,
-                    )
+class _TestFSResourceShared:
+    file = Path(__file__)
 
-    def test_cleanup_cache_dir_nothing_to_cleanup(self):
-        keychain = mock.Mock()
-        keychain.list_orgs.return_value = ["qa", "dev"]
-        org = OrgConfig(
-            config={"instance_url": "http://foo.my.salesforce.com/"},
-            name="qa",
-            keychain=keychain,
-            global_org=False,
-        )
-        keychain.get_org.return_value = org
-        project_config = mock.Mock()
-        with TemporaryDirectory() as temp_for_global:
-            keychain.global_config_dir = Path(temp_for_global)
-            with TemporaryDirectory() as temp_for_project:
-                cache_dir = project_config.project_cache_dir = Path(temp_for_project)
-                org_dir = cache_dir / "orginfo/foo.my.salesforce.com"
-                org_dir.mkdir(parents=True)
-                (org_dir / "schema.json").touch()
-                with mock.patch("cumulusci.utils.fileutils.rmtree") as rmtree:
-                    cleanup_org_cache_dirs(keychain, project_config)
-                    assert not rmtree.mock_calls, rmtree.mock_calls
+    def test_resource_exists_abspath(self):
+        abspath = os.path.abspath(self.file)
+        with open_fs_resource(abspath) as resource:
+            assert resource.exists()
+            assert str(resource.getsyspath()) == abspath
+
+    def test_resource_does_not_exist(self):
+        abspath = os.path.abspath(self.file)
+        with open_fs_resource(abspath + "xyzzy") as resource:
+            assert not resource.exists()
+            assert abspath + "xyzzy" in resource
+
+    def test_resource_exists_pathlib_abspath(self):
+        abspath = os.path.abspath(self.file)
+        with open_fs_resource(Path(abspath)) as resource:
+            assert resource.exists()
+            assert abspath in resource
+
+    def test_resource_doesnt_exist_pathlib_abspath(self):
+        abspath = os.path.abspath(self.file)
+        with open_fs_resource(Path(abspath + "xyzzy")) as resource:
+            assert not resource.exists()
+            assert abspath + "xyzzy" in resource
+
+    def test_resource_exists_url_abspath(self):
+        abspath = os.path.abspath(self.file)
+        url = f"file://{abspath}"
+        with open_fs_resource(url) as resource:
+            assert resource.exists()
+            assert abspath in resource
+
+    def test_resource_as_str(self):
+        abspath = os.path.abspath(self.file)
+        with open_fs_resource(Path(abspath)) as resource:
+            assert "file://" in repr(resource)
+
+    def test_join_paths(self):
+        parent = Path(self.file).parent
+        with open_fs_resource(parent) as resource:
+            this_file = resource / self.file.name
+            assert this_file.exists()
+
+    def test_clone_fsresource(self):
+        abspath = os.path.abspath(self.file)
+        with open_fs_resource(Path(abspath)) as resource:
+            with open_fs_resource(resource) as resource2:
+                assert abspath in str(resource2)
+
+    def test_load_from_file_system(self):
+        abspath = os.path.abspath(self.file)
+        fs = open_fs("/")
+        with open_fs_resource(abspath, fs) as f:
+            assert abspath in str(f)
+
+    def test_windows_path(self):
+        abspath = "c:\\foo\\bar"
+        with open_fs_resource(abspath) as f:
+            if sys.platform == "win32":
+                assert "c:\\foo\\bar" == str(f.getsyspath()), str(f.getsyspath())
+
+
+class TestFSResource(_TestFSResourceShared):
+    def test_resource_exists_relpath(self):
+        relpath = os.path.relpath(self.file)
+        with open_fs_resource(relpath) as resource:
+            assert resource.exists()
+            assert (
+                str(Path(resource.getsyspath()).relative_to(Path(".").absolute()))
+                == relpath
+            )
+
+    def test_resource_doesnt_exist_relpath(self):
+        relpath = os.path.relpath(self.file)
+        with open_fs_resource(relpath + "xyzzy") as resource:
+            assert not resource.exists()
+            assert relpath + "xyzzy" in resource
+
+    def test_resource_exists_pathlib_relpath(self):
+        relpath = os.path.relpath(self.file)
+        with open_fs_resource(Path(relpath)) as resource:
+            assert resource.exists()
+            assert relpath in resource
+
+    def test_resource_exists_url_relpath(self):
+        relpath = os.path.relpath(self.file)
+        url = f"file://{relpath}"
+        with open_fs_resource(url) as resource:
+            assert resource.exists()
+            assert relpath in resource
+
+    def test_resource_test_resource_doesnt_exist_pathlib_relpath(self):
+        relpath = os.path.relpath(self.file)
+        with open_fs_resource(Path(relpath + "xyzzy")) as resource:
+            assert not resource.exists()
+            assert relpath + "xyzzy" in resource
+
+
+class TestFSResourceTempdir(_TestFSResourceShared):
+    def setup(self):
+        self.tempdir = TemporaryDirectory()
+        self.file = Path(self.tempdir.name) / "testfile.txt"
+        self.file.touch()
+
+    def teardown(self):
+        self.tempdir.cleanup()
+
+    def test_copy_to(self):
+        abspath = os.path.abspath(self.file)
+        with open_fs_resource(abspath) as f:
+            f.copy_to(abspath + ".bak")
+            assert Path(abspath + ".bak").exists()
+            f.copy_to(Path(abspath + ".bak2"))
+            assert Path(abspath + ".bak2").exists()
+            f.copy_to(FSResource.new(abspath + ".bak3"))
+            assert Path(abspath + ".bak3").exists()
+
+    def test_mkdir_rmdir(self):
+        abspath = Path(self.tempdir.name) / "doesnotexist"
+        assert not abspath.exists()
+        with open_fs_resource(abspath) as f:
+            f.mkdir()
+            assert abspath.exists()
+            f.mkdir(exist_ok=True)
+            f.rmdir()
+
+        abspath = abspath / "foo" / "bar" / "baz"
+        assert not abspath.exists()
+        with open_fs_resource(abspath) as f:
+            f.mkdir(parents=True)
+            f.mkdir(parents=True, exist_ok=True)
+            f.mkdir(parents=False, exist_ok=True)
+            assert abspath.exists()
+
+            with pytest.raises(errors.DirectoryExists):
+                f.mkdir(parents=False, exist_ok=False)
+            f.rmdir()
+
+    def test_open_for_write(self):
+        abspath = Path(self.tempdir.name) / "blah"
+        with open_fs_resource(abspath) as fs:
+            fs.mkdir()
+            newfile = fs / "newfile"
+            with newfile.open("w") as f:
+                f.write("xyzzy")
+
+            with newfile.open("r") as f:
+                assert f.read() == "xyzzy"
+
+
+class TestFSResourceError:
+    def test_fs_resource_init_error(self):
+        with pytest.raises(NotImplementedError):
+            FSResource()
