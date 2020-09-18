@@ -23,7 +23,7 @@ pytz==2020.1
 PyYAML==5.3.1
 raven==6.10.0
 requests==2.24.0
-requests-futures==1.0.0  # Pending 3PP
+requests-futures==1.0.0
 robotframework==3.2.2
 robotframework-pabot==1.10.0
 robotframework-requests==0.7.1
