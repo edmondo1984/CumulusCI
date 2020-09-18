@@ -2,7 +2,76 @@
 History
 =======
 
+3.19.0 (2020-09-17)
+-------------------
+
+Changes:
+
+- Tasks and automation:
+
+  - CumulusCI now supports using the REST Collections API in data load, extract, and delete operations. By default, CumulusCI will select an API for you based on data volume (<2000 records uses the REST API, >=2000 uses Bulk); a desired API can be configured via the mapping file.
+  - Removed the namespace_tokenize option from tasks that deploy metadata, and removed the namespace_inject option from tasks that retrieve metadata, because it's unclear when they would be useful.
+  - The task create_permission_set allows for creating and assigning a Permission Set that enables specific User Permissions. (Note: other types of permissions are not yet supported).
+  - The task create_bulk_data_permission_set creates a Permission Set with the Hard Delete and Set Audit Fields permissions for use with data load operations. The org permission to allow Set Audit Fields must be turned on.
+  - CumulusCI's load_dataset and extract_dataset tasks now support relative dates. To take advantage of relative dates, include the anchor_date key (with a date in YYYY-MM-DD format) in each mapping step you wish to relativize. On extract, dates will be modified to be the same interval from the anchor date as they are from the current date; on load, dates will be modified to be the same interval from today's date as they are from their anchor. Both date and date-time fields are supported.
+
+- Other:
+
+  - The oid_as_pk key is no longer supported in bulk data mappings. (This key was already deprecated). Select object Id mode by including the Id field in mappings.
+
+Issues closed:
+
+  - Fixed an issue (#2001) that caused CumulusCI to extract invalid data sets when using after: steps with autoincrement primary keys.
+  - Fixed an issue where the retrieve_changes task did not actually retrieve folders.
+  - Fixed a bug in the metadeploy_publish task where labels starting with "Install " were not extracted for localization.
+  - Fixed a bug that prevented using JWT auth with sandboxes if the sandbox's instance_url did not include an instance name.
+  - Fixed a bug where ``cci project init`` generated an invalid mapping for bulk data tasks.
+
+3.18.0 (2020-09-03)
+-------------------
+
+Changes:
+
+-  Tasks and automation:
+
+   -  CumulusCI now tries 10 times (instead of 5) to install managed package versions, which helps ameliorate timeouts when new versions are released.
+   -  We added support for CSV files to the ``push_list`` task.
+   -  We added a ``ref`` option to ``github_copy_subtree`` to allow publishing a git reference (commit hash, branch, or tag).
+   -  Changed the ``disable_tdtm_trigger_handlers`` (SetTDTMHandlerStatus) task so that trigger handler state is remembered in the cache directory instead of ``REPO_ROOT``.
+
+-  User experience:
+
+   -  The ``cci error info`` command now defaults to showing the entire traceback when it is more than 30 lines.
+
+-  Robot Framework:
+
+   -  The following robot keywords have been updated to work with Winter '21:
+
+      -  ``Load related list``
+      -  ``Click related list button``
+      -  ``Click related item link``
+      -  ``Click related item popup link``
+      -  ``Go to object home``
+      -  ``Go to object list``
+      -  ``Go to record home``
+      -  ``Populate lookup field``
+
+   -  The keyword ``Load related list`` has been rewritten to be slightly more efficient. It also has a new parameter ``tries`` which can be used if the target is more than 1000 pixels below the bottom of the window.
+
+Issues Closed:
+
+-  Fixed a bug where ``cci error gist`` could throw a UnicodeDecodeError on Windows
+   (fixes #1977)
+-  Fixed a bug where ``cci org list`` could throw a TypeError when run
+   outside a project directory (fixes #1998)
+-  The ``metadeploy_publish`` task can now update translations for
+   language codes with more than 2 letters.
+-  Fixed a bug where the ``extract_dataset`` task could fail with a
+   UnicodeEnodeError on Windows.
+-  ``update_dependencies`` deduplicates its package install list, making it possible to handle situations where the same beta package is reached by two dependency paths.
+
 3.17.0 (2020-08-20)
+-------------------
 
 Changes:
 

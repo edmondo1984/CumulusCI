@@ -1,7 +1,3 @@
-import datetime
-
-from sqlalchemy import types
-from sqlalchemy import event
 from sqlalchemy import Column
 from sqlalchemy import Integer
 from sqlalchemy import Table
@@ -9,27 +5,6 @@ from sqlalchemy import Unicode
 from sqlalchemy.orm import mapper
 
 from cumulusci.core.exceptions import BulkDataException
-
-
-# Create a custom sqlalchemy field type for sqlite datetime fields which are stored as integer of epoch time
-class EpochType(types.TypeDecorator):
-    impl = types.Integer
-
-    epoch = datetime.datetime(1970, 1, 1, 0, 0, 0)
-
-    def process_bind_param(self, value, dialect):
-        return int((value - self.epoch).total_seconds()) * 1000
-
-    def process_result_value(self, value, dialect):
-        if value is not None:
-            return self.epoch + datetime.timedelta(seconds=value / 1000)
-
-
-# Listen for sqlalchemy column_reflect event and map datetime fields to EpochType
-@event.listens_for(Table, "column_reflect")
-def setup_epoch(inspector, table, column_info):
-    if isinstance(column_info["type"], types.DateTime):
-        column_info["type"] = EpochType()
 
 
 class SqlAlchemyMixin:
@@ -80,9 +55,8 @@ def _handle_primary_key(mapping, fields):
     """Provide support for legacy mappings which used the OID as the pk but
     default to using an autoincrementing int pk and a separate sf_id column"""
 
-    mapping["oid_as_pk"] = bool(mapping.get("fields", {}).get("Id"))
-    if mapping["oid_as_pk"]:
-        id_column = mapping["fields"]["Id"]
+    if mapping.get_oid_as_pk():
+        id_column = mapping.fields["Id"]
         fields.append(Column(id_column, Unicode(255), primary_key=True))
     else:
         fields.append(Column("id", Integer(), primary_key=True, autoincrement=True))
@@ -92,34 +66,24 @@ def create_table(mapping, metadata):
     """Given a mapping data structure (from mapping.yml) and SQLAlchemy
     metadata, create a table matching the mapping.
 
-    Mapping should be a dict-like with keys "fields", "table" and
-    optionally "oid_as_pk" and "record_type" """
+    Mapping should be a MappingStep instance"""
 
     fields = []
     _handle_primary_key(mapping, fields)
 
     # make a field list to create
-    for field in fields_for_mapping(mapping):
-        if mapping["oid_as_pk"] and field["sf"] == "Id":
+    for field, db in mapping.get_complete_field_map().items():
+        if field == "Id":
             continue
-        fields.append(Column(field["db"], Unicode(255)))
 
-    if "record_type" in mapping:
+        fields.append(Column(db, Unicode(255)))
+
+    if mapping.record_type:
         fields.append(Column("record_type", Unicode(255)))
-    t = Table(mapping["table"], metadata, *fields)
+    t = Table(mapping.table, metadata, *fields)
     if t.exists():
-        raise BulkDataException(f"Table already exists: {mapping['table']}")
+        raise BulkDataException(f"Table already exists: {mapping.table}")
     return t
-
-
-def fields_for_mapping(mapping):
-    """Summarize the list of fields in a table mapping"""
-    fields = []
-    for sf_field, db_field in mapping.get("fields", {}).items():
-        fields.append({"sf": sf_field, "db": db_field})
-    for sf_field, lookup in mapping.get("lookups", {}).items():
-        fields.append({"sf": sf_field, "db": lookup.get_lookup_key_field()})
-    return fields
 
 
 def generate_batches(num_records, batch_size):

@@ -693,6 +693,76 @@ Options
 
 	 Default: src.orig
 
+**create_permission_set**
+==========================================
+
+**Description:** Creates a Permission Set with specified User Permissions and assigns it to the running user.
+
+**Class:** cumulusci.tasks.salesforce.create_permission_sets.CreatePermissionSet
+
+Command Syntax
+------------------------------------------
+
+``$ cci task run create_permission_set``
+
+
+Options
+------------------------------------------
+
+
+``-o api_name APINAME``
+	 *Required*
+
+	 API name of generated Permission Set
+
+``-o user_permissions USERPERMISSIONS``
+	 *Required*
+
+	 List of User Permissions to include in the Permission Set.
+
+``-o label LABEL``
+	 *Optional*
+
+	 Label of generated Permission Set
+
+**create_bulk_data_permission_set**
+==========================================
+
+**Description:** Creates a Permission Set with the Hard Delete and Set Audit Fields user permissions. NOTE: the org setting to allow Set Audit Fields must be turned on.
+
+**Class:** cumulusci.tasks.salesforce.create_permission_sets.CreatePermissionSet
+
+Command Syntax
+------------------------------------------
+
+``$ cci task run create_bulk_data_permission_set``
+
+
+Options
+------------------------------------------
+
+
+``-o api_name APINAME``
+	 *Required*
+
+	 API name of generated Permission Set
+
+	 Default: CumulusCI_Bulk_Data
+
+``-o user_permissions USERPERMISSIONS``
+	 *Required*
+
+	 List of User Permissions to include in the Permission Set.
+
+	 Default: ['PermissionsBulkApiHardDelete', 'PermissionsCreateAuditFields']
+
+``-o label LABEL``
+	 *Optional*
+
+	 Label of generated Permission Set
+
+	 Default: CumulusCI Bulk Data
+
 **create_unmanaged_ee_src**
 ==========================================
 
@@ -766,6 +836,11 @@ Options
 
 	 If True, the package namespace prefix will be automatically added to objects and fields for which it is present in the org. Defaults to True.
 
+``-o api API``
+	 *Optional*
+
+	 The desired Salesforce API to use, which may be 'rest', 'bulk', or 'smart' to auto-select based on record volume. The default is 'smart'.
+
 **deploy**
 ==========================================
 
@@ -804,11 +879,6 @@ Options
 	 *Optional*
 
 	 If set, all namespace prefixes for the namespace specified are stripped from files and filenames
-
-``-o namespace_tokenize NAMESPACETOKENIZE``
-	 *Optional*
-
-	 If set, all namespace prefixes for the namespace specified are replaced with tokens for use with namespace_inject
 
 ``-o check_only CHECKONLY``
 	 *Optional*
@@ -878,11 +948,6 @@ Options
 	 *Optional*
 
 	 If set, all namespace prefixes for the namespace specified are stripped from files and filenames
-
-``-o namespace_tokenize NAMESPACETOKENIZE``
-	 *Optional*
-
-	 If set, all namespace prefixes for the namespace specified are replaced with tokens for use with namespace_inject
 
 ``-o check_only CHECKONLY``
 	 *Optional*
@@ -957,11 +1022,6 @@ Options
 
 	 If set, all namespace prefixes for the namespace specified are stripped from files and filenames
 
-``-o namespace_tokenize NAMESPACETOKENIZE``
-	 *Optional*
-
-	 If set, all namespace prefixes for the namespace specified are replaced with tokens for use with namespace_inject
-
 ``-o check_only CHECKONLY``
 	 *Optional*
 
@@ -1034,11 +1094,6 @@ Options
 	 *Optional*
 
 	 If set, all namespace prefixes for the namespace specified are stripped from files and filenames
-
-``-o namespace_tokenize NAMESPACETOKENIZE``
-	 *Optional*
-
-	 If set, all namespace prefixes for the namespace specified are replaced with tokens for use with namespace_inject
 
 ``-o check_only CHECKONLY``
 	 *Optional*
@@ -2535,16 +2590,6 @@ Options
 
 	 The package name to retrieve.  Defaults to project__package__name
 
-``-o unmanaged UNMANAGED``
-	 *Optional*
-
-	 If True, changes namespace_inject to replace tokens with a blank string
-
-``-o namespace_inject NAMESPACEINJECT``
-	 *Optional*
-
-	 If set, the namespace tokens in files and filenames are replaced with the namespace's prefix
-
 ``-o namespace_strip NAMESPACESTRIP``
 	 *Optional*
 
@@ -2594,16 +2639,6 @@ Options
 
 	 The package name to retrieve.  Defaults to project__package__name
 
-``-o unmanaged UNMANAGED``
-	 *Optional*
-
-	 If True, changes namespace_inject to replace tokens with a blank string
-
-``-o namespace_inject NAMESPACEINJECT``
-	 *Optional*
-
-	 If set, the namespace tokens in files and filenames are replaced with the namespace's prefix
-
 ``-o namespace_strip NAMESPACESTRIP``
 	 *Optional*
 
@@ -2650,16 +2685,6 @@ Options
 	 *Required*
 
 	 The path to a package.xml manifest to use for the retrieve.
-
-``-o unmanaged UNMANAGED``
-	 *Optional*
-
-	 If True, changes namespace_inject to replace tokens with a blank string
-
-``-o namespace_inject NAMESPACEINJECT``
-	 *Optional*
-
-	 If set, the namespace tokens in files and filenames are replaced with the namespace's prefix
 
 ``-o namespace_strip NAMESPACESTRIP``
 	 *Optional*
@@ -3486,11 +3511,6 @@ Options
 
 	 If set, all namespace prefixes for the namespace specified are stripped from files and filenames
 
-``-o namespace_tokenize NAMESPACETOKENIZE``
-	 *Optional*
-
-	 If set, all namespace prefixes for the namespace specified are replaced with tokens for use with namespace_inject
-
 ``-o check_only CHECKONLY``
 	 *Optional*
 
@@ -3564,11 +3584,6 @@ Options
 	 *Optional*
 
 	 If set, all namespace prefixes for the namespace specified are stripped from files and filenames
-
-``-o namespace_tokenize NAMESPACETOKENIZE``
-	 *Optional*
-
-	 If set, all namespace prefixes for the namespace specified are replaced with tokens for use with namespace_inject
 
 ``-o check_only CHECKONLY``
 	 *Optional*
