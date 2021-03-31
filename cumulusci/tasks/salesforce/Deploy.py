@@ -1,3 +1,4 @@
+import pathlib
 from typing import Optional
 
 from cumulusci.core.exceptions import TaskOptionsError
@@ -69,12 +70,21 @@ class Deploy(BaseSalesforceMetadataApiTask):
                 "The specified_tests option and test_level RunSpecifiedTests must be used together."
             )
 
+        self.options["namespace_inject"] = (
+            self.options.get("namespace_inject")
+            or self.project_config.project__package__namespace
+        )
+
     def _get_api(self, path=None):
         if not path:
             path = self.options.get("path")
 
         package_zip = self._get_package_zip(path)
-        self.logger.info("Payload size: {} bytes".format(len(package_zip)))
+        if package_zip is not None:
+            self.logger.info("Payload size: {} bytes".format(len(package_zip)))
+        else:
+            self.logger.warning("Deployment package is empty; skipping deployment.")
+            return
 
         return self.api_class(
             self,
@@ -97,10 +107,10 @@ class Deploy(BaseSalesforceMetadataApiTask):
 
     def _get_package_zip(self, path):
         assert path, f"Path should be specified for {self.__class__.name}"
-        if "namespace_inject" in self.options:
-            namespace = self.options["namespace_inject"]
-        else:
-            namespace = self.project_config.project__package__namespace
+        if not pathlib.Path(path).exists():
+            self.logger.warning(f"{path} not found.")
+            return
+        namespace = self.options["namespace_inject"]
         options = {
             **self.options,
             "clean_meta_xml": process_bool_arg(
@@ -111,9 +121,12 @@ class Deploy(BaseSalesforceMetadataApiTask):
             "namespaced_org": self._is_namespaced_org(namespace),
         }
 
-        return MetadataPackageZipBuilder(
+        package_zip = MetadataPackageZipBuilder(
             path=path, options=options, logger=self.logger
-        ).as_base64()
+        )
+        if not package_zip.zf.namelist():
+            return
+        return package_zip.as_base64()
 
     def freeze(self, step):
         steps = super(Deploy, self).freeze(step)
